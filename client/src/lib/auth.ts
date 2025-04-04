@@ -72,43 +72,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
 
     try {
-      // Always use demo users for now
-      if (true) {
-        console.log(`Using demo ${username} user for development`);
-        
-        // Create demo user based on role
-        let role = 'student';
-        if (username === 'admin') role = 'admin';
-        if (username === 'lecturer') role = 'lecturer';
-        
-        // Check password - for demo, we only accept "password"
-        if (password !== 'password') {
-          console.error('Invalid password for demo login');
-          throw new Error('Invalid password. For demo, please use "password"');
-        }
-        
-        console.log('Creating demo user with role:', role);
-        const demoUser = {
-          id: username === 'admin' ? 1 : username === 'lecturer' ? 2 : 3,
-          username,
-          firstName: username.charAt(0).toUpperCase() + username.slice(1),
-          lastName: 'User',
-          email: `${username}@example.com`,
-          role,
-          studentId: role === 'student' ? 'STU001' : null,
-          createdAt: new Date()
-        };
-        
-        // Save user to localStorage for persistence
-        console.log('Saving user to localStorage:', demoUser);
-        localStorage.setItem('demo_user', JSON.stringify(demoUser));
-        
-        console.log('Setting user in state');
-        setUser(demoUser as User);
-        
-        console.log('Login successful, returning user:', demoUser);
-        return demoUser;
-      }
+      // Simplify login - auto-login without checking credentials
+      console.log('Auto-login enabled - creating user without validation');
+      
+      // Default to student if no username given
+      const inputUsername = username || 'student';
+      
+      // Create demo user based on role
+      let role = 'student';
+      if (inputUsername === 'admin') role = 'admin';
+      if (inputUsername === 'lecturer') role = 'lecturer';
+      
+      console.log('Creating demo user with role:', role);
+      const demoUser = {
+        id: inputUsername === 'admin' ? 1 : inputUsername === 'lecturer' ? 2 : 3,
+        username: inputUsername,
+        firstName: inputUsername.charAt(0).toUpperCase() + inputUsername.slice(1),
+        lastName: 'User',
+        email: `${inputUsername}@example.com`,
+        role,
+        studentId: role === 'student' ? 'STU001' : null,
+        createdAt: new Date()
+      };
+      
+      // Save user to localStorage for persistence
+      console.log('Saving user to localStorage:', demoUser);
+      localStorage.setItem('demo_user', JSON.stringify(demoUser));
+      
+      console.log('Setting user in state');
+      setUser(demoUser as User);
+      
+      console.log('Login successful, returning user:', demoUser);
+      return demoUser;
       
       // Server login flow (uncommented)
       // Uncomment for production use:
