@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, pgEnum, date } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -89,6 +89,63 @@ export const activities = pgTable("activities", {
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
+// Announcements table
+export const announcements = pgTable("announcements", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  courseId: integer("course_id").references(() => courses.id),
+  createdById: integer("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  isPinned: boolean("is_pinned").default(false),
+  expiresAt: timestamp("expires_at"),
+});
+
+// Event categories
+export const eventCategoryEnum = pgEnum('event_category', ['academic', 'administrative', 'social', 'holiday']);
+
+// Events table (institution-wide events like ceremonies, holidays)
+export const events = pgTable("events", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  location: text("location"),
+  organizedById: integer("organized_by_id").references(() => users.id),
+  category: eventCategoryEnum("category").default('academic'),
+  isPublic: boolean("is_public").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Recurring session options: ONCE, DAILY, WEEKLY, BIWEEKLY, MONTHLY
+export const recurrenceTypeEnum = pgEnum('recurrence_type', ['once', 'daily', 'weekly', 'biweekly', 'monthly']);
+
+// Timetable entries
+export const timetable = pgTable("timetable", {
+  id: serial("id").primaryKey(),
+  courseId: integer("course_id").notNull().references(() => courses.id),
+  lecturerId: integer("lecturer_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  dayOfWeek: integer("day_of_week"), // 0-6 for Sunday-Saturday
+  startTime: text("start_time").notNull(), // 'HH:MM' format
+  endTime: text("end_time").notNull(), // 'HH:MM' format
+  location: text("location"),
+  recurrenceType: recurrenceTypeEnum("recurrence_type").default('weekly'),
+  startDate: date("start_date").notNull(), // Semester start
+  endDate: date("end_date").notNull(), // Semester end
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Announcement recipients (if targeting specific students instead of whole course)
+export const announcementRecipients = pgTable("announcement_recipients", {
+  id: serial("id").primaryKey(),
+  announcementId: integer("announcement_id").notNull().references(() => announcements.id, { onDelete: 'cascade' }),
+  studentId: integer("student_id").notNull().references(() => users.id),
+  isRead: boolean("is_read").default(false),
+  readAt: timestamp("read_at"),
+});
+
 // Define relations for users
 export const usersRelations = relations(users, ({ many, one }: { many: any; one: any }) => ({
   taughtCourses: many(courses, { relationName: "course_lecturer" }),
@@ -98,6 +155,10 @@ export const usersRelations = relations(users, ({ many, one }: { many: any; one:
   examEligibilities: many(examEligibility, { relationName: "student_eligibilities" }),
   verifiedEligibilities: many(examEligibility, { relationName: "eligibility_verifier" }),
   activities: many(activities, { relationName: "user_activities" }),
+  announcements: many(announcements, { relationName: "user_announcements" }),
+  announcementRecipients: many(announcementRecipients, { relationName: "student_announcements" }),
+  organizedEvents: many(events, { relationName: "event_organizer" }),
+  timetableEntries: many(timetable, { relationName: "lecturer_timetable" }),
 }));
 
 // Define relations for courses
@@ -110,6 +171,8 @@ export const coursesRelations = relations(courses, ({ many, one }: { many: any; 
   enrollments: many(enrollments, { relationName: "course_enrollments" }),
   sessions: many(sessions, { relationName: "course_sessions" }),
   exams: many(exams, { relationName: "course_exams" }),
+  announcements: many(announcements, { relationName: "course_announcements" }),
+  timetableEntries: many(timetable, { relationName: "course_timetable" }),
 }));
 
 // Define relations for enrollments
@@ -193,6 +256,58 @@ export const activitiesRelations = relations(activities, ({ one }: { one: any })
   }),
 }));
 
+// Define relations for announcements
+export const announcementsRelations = relations(announcements, ({ one, many }: { one: any; many: any }) => ({
+  course: one(courses, {
+    fields: [announcements.courseId],
+    references: [courses.id],
+    relationName: "course_announcements",
+  }),
+  creator: one(users, {
+    fields: [announcements.createdById],
+    references: [users.id],
+    relationName: "user_announcements",
+  }),
+  recipients: many(announcementRecipients, { relationName: "announcement_recipients" }),
+}));
+
+// Define relations for announcement recipients
+export const announcementRecipientsRelations = relations(announcementRecipients, ({ one }: { one: any }) => ({
+  announcement: one(announcements, {
+    fields: [announcementRecipients.announcementId],
+    references: [announcements.id],
+    relationName: "announcement_recipients",
+  }),
+  student: one(users, {
+    fields: [announcementRecipients.studentId],
+    references: [users.id],
+    relationName: "student_announcements",
+  }),
+}));
+
+// Define relations for events
+export const eventsRelations = relations(events, ({ one }: { one: any }) => ({
+  organizer: one(users, {
+    fields: [events.organizedById],
+    references: [users.id],
+    relationName: "event_organizer",
+  }),
+}));
+
+// Define relations for timetable
+export const timetableRelations = relations(timetable, ({ one }: { one: any }) => ({
+  course: one(courses, {
+    fields: [timetable.courseId],
+    references: [courses.id],
+    relationName: "course_timetable",
+  }),
+  lecturer: one(users, {
+    fields: [timetable.lecturerId],
+    references: [users.id],
+    relationName: "lecturer_timetable",
+  }),
+}));
+
 // Insert schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -231,6 +346,26 @@ export const insertActivitySchema = createInsertSchema(activities).omit({
   timestamp: true,
 });
 
+export const insertAnnouncementSchema = createInsertSchema(announcements).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAnnouncementRecipientSchema = createInsertSchema(announcementRecipients).omit({
+  id: true,
+  readAt: true,
+});
+
+export const insertEventSchema = createInsertSchema(events).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTimetableEntrySchema = createInsertSchema(timetable).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Auth schemas
 export const loginSchema = z.object({
   username: z.string().min(3),
@@ -261,5 +396,17 @@ export type ExamEligibility = typeof examEligibility.$inferSelect;
 
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type Activity = typeof activities.$inferSelect;
+
+export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
+export type Announcement = typeof announcements.$inferSelect;
+
+export type InsertAnnouncementRecipient = z.infer<typeof insertAnnouncementRecipientSchema>;
+export type AnnouncementRecipient = typeof announcementRecipients.$inferSelect;
+
+export type InsertEvent = z.infer<typeof insertEventSchema>;
+export type Event = typeof events.$inferSelect;
+
+export type InsertTimetableEntry = z.infer<typeof insertTimetableEntrySchema>;
+export type TimetableEntry = typeof timetable.$inferSelect;
 
 export type LoginCredentials = z.infer<typeof loginSchema>;

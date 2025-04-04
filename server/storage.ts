@@ -1,8 +1,11 @@
 import {
   users, courses, enrollments, sessions, attendance, exams, examEligibility, activities,
+  announcements, announcementRecipients, events, timetable,
   type User, type InsertUser, type Course, type InsertCourse, type Enrollment, type InsertEnrollment,
   type Session, type InsertSession, type Attendance, type InsertAttendance, type Exam, type InsertExam,
-  type ExamEligibility, type InsertExamEligibility, type Activity, type InsertActivity
+  type ExamEligibility, type InsertExamEligibility, type Activity, type InsertActivity,
+  type Announcement, type InsertAnnouncement, type AnnouncementRecipient, type InsertAnnouncementRecipient,
+  type Event, type InsertEvent, type TimetableEntry, type InsertTimetableEntry
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, count } from "drizzle-orm";
@@ -64,6 +67,35 @@ export interface IStorage {
   getActivities(limit?: number): Promise<Activity[]>;
   getActivitiesByUser(userId: number): Promise<Activity[]>;
   createActivity(activity: InsertActivity): Promise<Activity>;
+  
+  // Announcement operations
+  getAnnouncement(id: number): Promise<Announcement | undefined>;
+  getAnnouncements(): Promise<Announcement[]>;
+  getAnnouncementsByCourse(courseId: number): Promise<Announcement[]>;
+  getAnnouncementsForStudent(studentId: number): Promise<Announcement[]>;
+  createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
+  
+  // Announcement recipient operations
+  getAnnouncementRecipient(id: number): Promise<AnnouncementRecipient | undefined>;
+  getAnnouncementRecipientsByAnnouncement(announcementId: number): Promise<AnnouncementRecipient[]>;
+  getAnnouncementRecipientsByStudent(studentId: number): Promise<AnnouncementRecipient[]>;
+  createAnnouncementRecipient(recipient: InsertAnnouncementRecipient): Promise<AnnouncementRecipient>;
+  markAnnouncementAsRead(id: number): Promise<AnnouncementRecipient | undefined>;
+  
+  // Event operations
+  getEvent(id: number): Promise<Event | undefined>;
+  getEvents(): Promise<Event[]>;
+  getEventsByCategory(category: string): Promise<Event[]>;
+  getEventsByDateRange(startDate: Date, endDate: Date): Promise<Event[]>;
+  createEvent(event: InsertEvent): Promise<Event>;
+  
+  // Timetable operations
+  getTimetableEntry(id: number): Promise<TimetableEntry | undefined>;
+  getTimetableEntries(): Promise<TimetableEntry[]>;
+  getTimetableByCourse(courseId: number): Promise<TimetableEntry[]>;
+  getTimetableByLecturer(lecturerId: number): Promise<TimetableEntry[]>;
+  getTimetableForStudent(studentId: number): Promise<TimetableEntry[]>;
+  createTimetableEntry(entry: InsertTimetableEntry): Promise<TimetableEntry>;
 }
 
 export class MemStorage implements IStorage {
@@ -75,6 +107,10 @@ export class MemStorage implements IStorage {
   private exams: Map<number, Exam>;
   private examEligibilities: Map<number, ExamEligibility>;
   private activities: Map<number, Activity>;
+  private announcements: Map<number, Announcement>;
+  private announcementRecipients: Map<number, AnnouncementRecipient>;
+  private events: Map<number, Event>;
+  private timetableEntries: Map<number, TimetableEntry>;
   
   // IDs for auto-increment
   private userId: number;
@@ -85,6 +121,10 @@ export class MemStorage implements IStorage {
   private examId: number;
   private examEligibilityId: number;
   private activityId: number;
+  private announcementId: number;
+  private announcementRecipientId: number;
+  private eventId: number;
+  private timetableEntryId: number;
 
   constructor() {
     this.users = new Map();
@@ -95,6 +135,10 @@ export class MemStorage implements IStorage {
     this.exams = new Map();
     this.examEligibilities = new Map();
     this.activities = new Map();
+    this.announcements = new Map();
+    this.announcementRecipients = new Map();
+    this.events = new Map();
+    this.timetableEntries = new Map();
     
     this.userId = 1;
     this.courseId = 1;
@@ -104,6 +148,10 @@ export class MemStorage implements IStorage {
     this.examId = 1;
     this.examEligibilityId = 1;
     this.activityId = 1;
+    this.announcementId = 1;
+    this.announcementRecipientId = 1;
+    this.eventId = 1;
+    this.timetableEntryId = 1;
 
     // Add some sample data for testing
     this.initSampleData();
@@ -412,6 +460,166 @@ export class MemStorage implements IStorage {
     this.activities.set(id, activity);
     return activity;
   }
+
+  // Announcement operations
+  async getAnnouncement(id: number): Promise<Announcement | undefined> {
+    return this.announcements.get(id);
+  }
+
+  async getAnnouncements(): Promise<Announcement[]> {
+    return Array.from(this.announcements.values())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getAnnouncementsByCourse(courseId: number): Promise<Announcement[]> {
+    return Array.from(this.announcements.values())
+      .filter(announcement => announcement.courseId === courseId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getAnnouncementsForStudent(studentId: number): Promise<Announcement[]> {
+    const studentUser = await this.getUser(studentId);
+    if (!studentUser) return [];
+
+    // Get all recipient records for this student
+    const recipientRecords = Array.from(this.announcementRecipients.values())
+      .filter(rec => rec.studentId === studentId);
+    
+    // Get announcement IDs from recipient records
+    const announcementIds = recipientRecords.map(rec => rec.announcementId);
+    
+    // Return all announcements that match the IDs
+    return Array.from(this.announcements.values())
+      .filter(ann => announcementIds.includes(ann.id) || ann.isGlobal)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async createAnnouncement(insertAnnouncement: InsertAnnouncement): Promise<Announcement> {
+    const id = this.announcementId++;
+    const now = new Date();
+    const announcement: Announcement = { ...insertAnnouncement, id, createdAt: now };
+    this.announcements.set(id, announcement);
+    return announcement;
+  }
+
+  // Announcement recipient operations
+  async getAnnouncementRecipient(id: number): Promise<AnnouncementRecipient | undefined> {
+    return this.announcementRecipients.get(id);
+  }
+
+  async getAnnouncementRecipientsByAnnouncement(announcementId: number): Promise<AnnouncementRecipient[]> {
+    return Array.from(this.announcementRecipients.values())
+      .filter(recipient => recipient.announcementId === announcementId);
+  }
+
+  async getAnnouncementRecipientsByStudent(studentId: number): Promise<AnnouncementRecipient[]> {
+    return Array.from(this.announcementRecipients.values())
+      .filter(recipient => recipient.studentId === studentId);
+  }
+
+  async createAnnouncementRecipient(insertRecipient: InsertAnnouncementRecipient): Promise<AnnouncementRecipient> {
+    const id = this.announcementRecipientId++;
+    const recipient: AnnouncementRecipient = { 
+      ...insertRecipient, 
+      id, 
+      isRead: false,
+      readAt: null 
+    };
+    this.announcementRecipients.set(id, recipient);
+    return recipient;
+  }
+
+  async markAnnouncementAsRead(id: number): Promise<AnnouncementRecipient | undefined> {
+    const recipient = this.announcementRecipients.get(id);
+    if (!recipient) return undefined;
+    
+    const now = new Date();
+    const updatedRecipient: AnnouncementRecipient = { 
+      ...recipient, 
+      isRead: true,
+      readAt: now
+    };
+    this.announcementRecipients.set(id, updatedRecipient);
+    return updatedRecipient;
+  }
+
+  // Event operations
+  async getEvent(id: number): Promise<Event | undefined> {
+    return this.events.get(id);
+  }
+
+  async getEvents(): Promise<Event[]> {
+    return Array.from(this.events.values())
+      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  }
+
+  async getEventsByCategory(category: string): Promise<Event[]> {
+    return Array.from(this.events.values())
+      .filter(event => event.category === category)
+      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  }
+
+  async getEventsByDateRange(startDate: Date, endDate: Date): Promise<Event[]> {
+    return Array.from(this.events.values())
+      .filter(event => {
+        const eventStart = event.startDate;
+        const eventEnd = new Date(eventStart.getTime() + event.duration * 60000); // duration is in minutes
+        return eventStart >= startDate && eventEnd <= endDate;
+      })
+      .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  }
+
+  async createEvent(insertEvent: InsertEvent): Promise<Event> {
+    const id = this.eventId++;
+    const event: Event = { ...insertEvent, id };
+    this.events.set(id, event);
+    return event;
+  }
+
+  // Timetable operations
+  async getTimetableEntry(id: number): Promise<TimetableEntry | undefined> {
+    return this.timetableEntries.get(id);
+  }
+
+  async getTimetableEntries(): Promise<TimetableEntry[]> {
+    return Array.from(this.timetableEntries.values())
+      .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+  }
+
+  async getTimetableByCourse(courseId: number): Promise<TimetableEntry[]> {
+    return Array.from(this.timetableEntries.values())
+      .filter(entry => entry.courseId === courseId)
+      .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+  }
+
+  async getTimetableByLecturer(lecturerId: number): Promise<TimetableEntry[]> {
+    // Get all courses taught by this lecturer
+    const lecturerCourses = await this.getCoursesByLecturer(lecturerId);
+    const lecturerCourseIds = lecturerCourses.map(course => course.id);
+    
+    // Get all timetable entries for these courses
+    return Array.from(this.timetableEntries.values())
+      .filter(entry => lecturerCourseIds.includes(entry.courseId))
+      .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+  }
+
+  async getTimetableForStudent(studentId: number): Promise<TimetableEntry[]> {
+    // Get all enrollments for this student
+    const studentEnrollments = await this.getEnrollmentsByStudent(studentId);
+    const enrolledCourseIds = studentEnrollments.map(enrollment => enrollment.courseId);
+    
+    // Get all timetable entries for these courses
+    return Array.from(this.timetableEntries.values())
+      .filter(entry => enrolledCourseIds.includes(entry.courseId))
+      .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+  }
+
+  async createTimetableEntry(insertEntry: InsertTimetableEntry): Promise<TimetableEntry> {
+    const id = this.timetableEntryId++;
+    const entry: TimetableEntry = { ...insertEntry, id };
+    this.timetableEntries.set(id, entry);
+    return entry;
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -696,6 +904,208 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return activity;
+  }
+
+  // Announcement operations
+  async getAnnouncement(id: number): Promise<Announcement | undefined> {
+    const [announcement] = await db.select().from(announcements).where(eq(announcements.id, id));
+    return announcement;
+  }
+
+  async getAnnouncements(): Promise<Announcement[]> {
+    return db.select()
+      .from(announcements)
+      .orderBy(desc(announcements.createdAt));
+  }
+
+  async getAnnouncementsByCourse(courseId: number): Promise<Announcement[]> {
+    return db.select()
+      .from(announcements)
+      .where(eq(announcements.courseId, courseId))
+      .orderBy(desc(announcements.createdAt));
+  }
+
+  async getAnnouncementsForStudent(studentId: number): Promise<Announcement[]> {
+    // Get the student user
+    const [student] = await db.select().from(users).where(eq(users.id, studentId));
+    if (!student) return [];
+
+    // Get announcements specifically for this student and global announcements
+    const recipientAnnouncements = await db.select({
+      announcementId: announcementRecipients.announcementId
+    })
+    .from(announcementRecipients)
+    .where(eq(announcementRecipients.studentId, studentId));
+    
+    const announcementIds = recipientAnnouncements.map(r => r.announcementId);
+    
+    if (announcementIds.length === 0) {
+      return db.select()
+        .from(announcements)
+        .where(eq(announcements.isGlobal, true))
+        .orderBy(desc(announcements.createdAt));
+    }
+    
+    // Use SQL to get either global announcements or those specifically for this student
+    return db.select()
+      .from(announcements)
+      .where(
+        sql`${announcements.isGlobal} = true OR ${announcements.id} IN (${announcementIds.join(',')})`
+      )
+      .orderBy(desc(announcements.createdAt));
+  }
+
+  async createAnnouncement(insertAnnouncement: InsertAnnouncement): Promise<Announcement> {
+    const [announcement] = await db.insert(announcements)
+      .values({
+        ...insertAnnouncement,
+        createdAt: new Date(),
+        isGlobal: insertAnnouncement.isGlobal || false
+      } as any)
+      .returning();
+    return announcement;
+  }
+
+  // Announcement recipient operations
+  async getAnnouncementRecipient(id: number): Promise<AnnouncementRecipient | undefined> {
+    const [recipient] = await db.select().from(announcementRecipients).where(eq(announcementRecipients.id, id));
+    return recipient;
+  }
+
+  async getAnnouncementRecipientsByAnnouncement(announcementId: number): Promise<AnnouncementRecipient[]> {
+    return db.select()
+      .from(announcementRecipients)
+      .where(eq(announcementRecipients.announcementId, announcementId));
+  }
+
+  async getAnnouncementRecipientsByStudent(studentId: number): Promise<AnnouncementRecipient[]> {
+    return db.select()
+      .from(announcementRecipients)
+      .where(eq(announcementRecipients.studentId, studentId));
+  }
+
+  async createAnnouncementRecipient(insertRecipient: InsertAnnouncementRecipient): Promise<AnnouncementRecipient> {
+    const [recipient] = await db.insert(announcementRecipients)
+      .values({
+        ...insertRecipient,
+        isRead: false,
+        readAt: null
+      })
+      .returning();
+    return recipient;
+  }
+
+  async markAnnouncementAsRead(id: number): Promise<AnnouncementRecipient | undefined> {
+    const [recipient] = await db.update(announcementRecipients)
+      .set({
+        isRead: true,
+        readAt: new Date()
+      })
+      .where(eq(announcementRecipients.id, id))
+      .returning();
+    return recipient;
+  }
+
+  // Event operations
+  async getEvent(id: number): Promise<Event | undefined> {
+    const [event] = await db.select().from(events).where(eq(events.id, id));
+    return event;
+  }
+
+  async getEvents(): Promise<Event[]> {
+    return db.select()
+      .from(events)
+      .orderBy(events.startDate);
+  }
+
+  async getEventsByCategory(category: string): Promise<Event[]> {
+    return db.select()
+      .from(events)
+      .where(eq(events.category, category))
+      .orderBy(events.startDate);
+  }
+
+  async getEventsByDateRange(startDate: Date, endDate: Date): Promise<Event[]> {
+    return db.select()
+      .from(events)
+      .where(
+        and(
+          sql`${events.startDate} >= ${startDate.toISOString()}`,
+          sql`DATE_ADD(${events.startDate}, INTERVAL ${events.duration} MINUTE) <= ${endDate.toISOString()}`
+        )
+      )
+      .orderBy(events.startDate);
+  }
+
+  async createEvent(insertEvent: InsertEvent): Promise<Event> {
+    const [event] = await db.insert(events)
+      .values({
+        ...insertEvent,
+        createdAt: new Date()
+      } as any)
+      .returning();
+    return event;
+  }
+
+  // Timetable operations
+  async getTimetableEntry(id: number): Promise<TimetableEntry | undefined> {
+    const [entry] = await db.select().from(timetable).where(eq(timetable.id, id));
+    return entry;
+  }
+
+  async getTimetableEntries(): Promise<TimetableEntry[]> {
+    return db.select()
+      .from(timetable)
+      .orderBy(timetable.dayOfWeek, timetable.startTime);
+  }
+
+  async getTimetableByCourse(courseId: number): Promise<TimetableEntry[]> {
+    return db.select()
+      .from(timetable)
+      .where(eq(timetable.courseId, courseId))
+      .orderBy(timetable.dayOfWeek, timetable.startTime);
+  }
+
+  async getTimetableByLecturer(lecturerId: number): Promise<TimetableEntry[]> {
+    // Get all courses taught by this lecturer
+    const lecturerCourses = await this.getCoursesByLecturer(lecturerId);
+    const courseIds = lecturerCourses.map(course => course.id);
+    
+    if (courseIds.length === 0) {
+      return [];
+    }
+    
+    // Get timetable entries for these courses
+    return db.select()
+      .from(timetable)
+      .where(sql`${timetable.courseId} IN (${courseIds.join(',')})`)
+      .orderBy(timetable.dayOfWeek, timetable.startTime);
+  }
+
+  async getTimetableForStudent(studentId: number): Promise<TimetableEntry[]> {
+    // Get all enrollments for this student
+    const studentEnrollments = await this.getEnrollmentsByStudent(studentId);
+    const courseIds = studentEnrollments.map(enrollment => enrollment.courseId);
+    
+    if (courseIds.length === 0) {
+      return [];
+    }
+    
+    // Get timetable entries for these courses
+    return db.select()
+      .from(timetable)
+      .where(sql`${timetable.courseId} IN (${courseIds.join(',')})`)
+      .orderBy(timetable.dayOfWeek, timetable.startTime);
+  }
+
+  async createTimetableEntry(insertEntry: InsertTimetableEntry): Promise<TimetableEntry> {
+    const [entry] = await db.insert(timetable)
+      .values({
+        ...insertEntry,
+        createdAt: new Date()
+      } as any)
+      .returning();
+    return entry;
   }
 }
 

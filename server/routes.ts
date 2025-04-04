@@ -12,7 +12,11 @@ import {
   insertAttendanceSchema,
   insertExamSchema,
   insertExamEligibilitySchema,
-  insertEnrollmentSchema
+  insertEnrollmentSchema,
+  insertAnnouncementSchema,
+  insertAnnouncementRecipientSchema,
+  insertEventSchema,
+  insertTimetableEntrySchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -345,6 +349,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(activities);
     } catch (error) {
       res.status(500).json({ message: "Error fetching activities" });
+    }
+  });
+
+  // Announcement routes
+  app.get("/api/announcements", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const courseId = req.query.courseId ? Number(req.query.courseId) : undefined;
+      const studentId = req.query.studentId ? Number(req.query.studentId) : undefined;
+      
+      if (courseId) {
+        const announcements = await storage.getAnnouncementsByCourse(courseId);
+        return res.json(announcements);
+      }
+
+      if (studentId) {
+        const announcements = await storage.getAnnouncementsForStudent(studentId);
+        return res.json(announcements);
+      }
+      
+      const announcements = await storage.getAnnouncements();
+      res.json(announcements);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching announcements" });
+    }
+  });
+
+  app.post("/api/announcements", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const announcementData = insertAnnouncementSchema.parse({
+        ...req.body,
+        createdById: req.session.userId
+      });
+      
+      const announcement = await storage.createAnnouncement(announcementData);
+      
+      // Log the activity
+      await storage.createActivity({
+        userId: req.session.userId!,
+        action: "Announcement Created",
+        details: `Created announcement: ${announcementData.title}`,
+      });
+      
+      res.status(201).json(announcement);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", details: error.format() });
+      }
+      res.status(500).json({ message: "Error creating announcement" });
+    }
+  });
+
+  // Announcement recipients routes
+  app.post("/api/announcement-recipients", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const { announcementId, studentIds } = req.body;
+      
+      if (!announcementId || !studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+        return res.status(400).json({ message: "Announcement ID and student IDs are required" });
+      }
+      
+      const recipients = [];
+      
+      for (const studentId of studentIds) {
+        const recipient = await storage.createAnnouncementRecipient({
+          announcementId,
+          studentId,
+          isRead: false,
+        });
+        
+        recipients.push(recipient);
+      }
+      
+      res.status(201).json(recipients);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", details: error.format() });
+      }
+      res.status(500).json({ message: "Error adding announcement recipients" });
+    }
+  });
+
+  app.put("/api/announcement-recipients/:id/mark-read", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid announcement recipient ID" });
+      }
+      
+      const recipient = await storage.markAnnouncementAsRead(id);
+      
+      if (!recipient) {
+        return res.status(404).json({ message: "Announcement recipient not found" });
+      }
+      
+      res.json(recipient);
+    } catch (error) {
+      res.status(500).json({ message: "Error marking announcement as read" });
+    }
+  });
+
+  // Event routes
+  app.get("/api/events", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const category = req.query.category as string | undefined;
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+      
+      let events;
+      
+      if (startDate && endDate) {
+        events = await storage.getEventsByDateRange(startDate, endDate);
+      } else if (category) {
+        events = await storage.getEventsByCategory(category);
+      } else {
+        events = await storage.getEvents();
+      }
+      
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching events" });
+    }
+  });
+
+  app.post("/api/events", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const eventData = insertEventSchema.parse({
+        ...req.body,
+        organizedById: req.session.userId
+      });
+      
+      const event = await storage.createEvent(eventData);
+      
+      // Log the activity
+      await storage.createActivity({
+        userId: req.session.userId!,
+        action: "Event Created",
+        details: `Created event: ${eventData.title}`,
+      });
+      
+      res.status(201).json(event);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", details: error.format() });
+      }
+      res.status(500).json({ message: "Error creating event" });
+    }
+  });
+
+  // Timetable routes
+  app.get("/api/timetable", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const courseId = req.query.courseId ? Number(req.query.courseId) : undefined;
+      const lecturerId = req.query.lecturerId ? Number(req.query.lecturerId) : undefined;
+      const studentId = req.query.studentId ? Number(req.query.studentId) : undefined;
+      
+      if (courseId) {
+        const entries = await storage.getTimetableByCourse(courseId);
+        return res.json(entries);
+      }
+      
+      if (lecturerId) {
+        const entries = await storage.getTimetableByLecturer(lecturerId);
+        return res.json(entries);
+      }
+      
+      if (studentId) {
+        const entries = await storage.getTimetableForStudent(studentId);
+        return res.json(entries);
+      }
+      
+      const entries = await storage.getTimetableEntries();
+      res.json(entries);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching timetable entries" });
+    }
+  });
+
+  app.post("/api/timetable", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const timetableData = insertTimetableEntrySchema.parse(req.body);
+      const entry = await storage.createTimetableEntry(timetableData);
+      
+      // Log the activity
+      await storage.createActivity({
+        userId: req.session.userId!,
+        action: "Timetable Entry Created",
+        details: `Created timetable entry: ${timetableData.title} for course ${timetableData.courseId}`,
+      });
+      
+      res.status(201).json(entry);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", details: error.format() });
+      }
+      res.status(500).json({ message: "Error creating timetable entry" });
     }
   });
 
