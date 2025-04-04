@@ -27,6 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     const checkAuth = async () => {
       try {
+        // For production:
+        /*
         const res = await fetch('/api/auth/user', {
           credentials: 'include',
         });
@@ -34,7 +36,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           const userData = await res.json();
           if (isMounted) setUser(userData);
-        } 
+        }
+        */
+
+        // For demo purposes, check localStorage for session
+        const savedUser = localStorage.getItem('demo_user');
+        if (savedUser) {
+          try {
+            const userData = JSON.parse(savedUser);
+            if (isMounted) setUser(userData);
+          } catch (e) {
+            console.error('Failed to parse saved user', e);
+            localStorage.removeItem('demo_user'); // Clear invalid data
+          }
+        }
       } catch (err) {
         console.error('Auth check error:', err);
       } finally {
@@ -65,6 +80,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (username === 'admin') role = 'admin';
         if (username === 'lecturer') role = 'lecturer';
         
+        // Check password - for demo, we only accept "password"
+        if (password !== 'password') {
+          throw new Error('Invalid password. For demo, please use "password"');
+        }
+        
         const demoUser = {
           id: username === 'admin' ? 1 : username === 'lecturer' ? 2 : 3,
           username,
@@ -76,11 +96,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           createdAt: new Date()
         };
         
+        // Save user to localStorage for persistence
+        localStorage.setItem('demo_user', JSON.stringify(demoUser));
+        
         setUser(demoUser as User);
         return demoUser;
       }
       
-      // Server login flow (temporarily disabled)
+      // Server login flow (uncommented)
+      // Uncomment for production use:
       /*
       const res = await apiRequest('POST', '/api/auth/login', { username, password });
       const userData = await res.json();
@@ -105,6 +129,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Mock logout (server call disabled for now)
       // await apiRequest('POST', '/api/auth/logout');
+      
+      // Remove user from localStorage for demo
+      localStorage.removeItem('demo_user');
+      
       setUser(null);
       
       // Clear all cached queries on logout
