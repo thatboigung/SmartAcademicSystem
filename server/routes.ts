@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { isAuthenticated, hasRole, login, logout, getCurrentUser } from "./auth";
 import { generateQRToken, verifyQRToken, checkExamEligibility } from "./qrcode";
 import session from "express-session";
-import MemoryStore from "memorystore";
+import connectPgSimple from "connect-pg-simple";
 import {
   insertUserSchema,
   insertCourseSchema,
@@ -16,7 +16,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 
-const MemoryStoreSession = MemoryStore(session);
+const PgSession = connectPgSimple(session);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up session middleware
@@ -26,8 +26,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       resave: false,
       saveUninitialized: false,
       cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }, // 1 day
-      store: new MemoryStoreSession({
-        checkPeriod: 86400000, // prune expired entries every 24h
+      store: new PgSession({
+        conObject: {
+          connectionString: process.env.DATABASE_URL,
+        },
+        createTableIfMissing: true,
       }),
     })
   );

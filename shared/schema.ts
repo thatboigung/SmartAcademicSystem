@@ -1,4 +1,5 @@
 import { pgTable, text, serial, integer, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -87,6 +88,110 @@ export const activities = pgTable("activities", {
   details: text("details"),
   timestamp: timestamp("timestamp").defaultNow(),
 });
+
+// Define relations for users
+export const usersRelations = relations(users, ({ many, one }: { many: any; one: any }) => ({
+  taughtCourses: many(courses, { relationName: "course_lecturer" }),
+  enrollments: many(enrollments, { relationName: "student_enrollments" }),
+  attendance: many(attendance, { relationName: "student_attendance" }),
+  markedAttendances: many(attendance, { relationName: "attendance_marker" }),
+  examEligibilities: many(examEligibility, { relationName: "student_eligibilities" }),
+  verifiedEligibilities: many(examEligibility, { relationName: "eligibility_verifier" }),
+  activities: many(activities, { relationName: "user_activities" }),
+}));
+
+// Define relations for courses
+export const coursesRelations = relations(courses, ({ many, one }: { many: any; one: any }) => ({
+  lecturer: one(users, {
+    fields: [courses.lecturerId],
+    references: [users.id],
+    relationName: "course_lecturer",
+  }),
+  enrollments: many(enrollments, { relationName: "course_enrollments" }),
+  sessions: many(sessions, { relationName: "course_sessions" }),
+  exams: many(exams, { relationName: "course_exams" }),
+}));
+
+// Define relations for enrollments
+export const enrollmentsRelations = relations(enrollments, ({ one }: { one: any }) => ({
+  student: one(users, {
+    fields: [enrollments.studentId],
+    references: [users.id],
+    relationName: "student_enrollments",
+  }),
+  course: one(courses, {
+    fields: [enrollments.courseId],
+    references: [courses.id],
+    relationName: "course_enrollments",
+  }),
+}));
+
+// Define relations for sessions
+export const sessionsRelations = relations(sessions, ({ one, many }: { one: any; many: any }) => ({
+  course: one(courses, {
+    fields: [sessions.courseId],
+    references: [courses.id],
+    relationName: "course_sessions",
+  }),
+  attendances: many(attendance, { relationName: "session_attendances" }),
+}));
+
+// Define relations for attendance
+export const attendanceRelations = relations(attendance, ({ one }: { one: any }) => ({
+  session: one(sessions, {
+    fields: [attendance.sessionId],
+    references: [sessions.id],
+    relationName: "session_attendances",
+  }),
+  student: one(users, {
+    fields: [attendance.studentId],
+    references: [users.id],
+    relationName: "student_attendance",
+  }),
+  markedBy: one(users, {
+    fields: [attendance.markedById],
+    references: [users.id],
+    relationName: "attendance_marker",
+  }),
+}));
+
+// Define relations for exams
+export const examsRelations = relations(exams, ({ one, many }: { one: any; many: any }) => ({
+  course: one(courses, {
+    fields: [exams.courseId],
+    references: [courses.id],
+    relationName: "course_exams",
+  }),
+  eligibilities: many(examEligibility, { relationName: "exam_eligibilities" }),
+}));
+
+// Define relations for exam eligibility
+export const examEligibilityRelations = relations(examEligibility, ({ one }: { one: any }) => ({
+  exam: one(exams, {
+    fields: [examEligibility.examId],
+    references: [exams.id],
+    relationName: "exam_eligibilities",
+  }),
+  student: one(users, {
+    fields: [examEligibility.studentId],
+    references: [users.id],
+    relationName: "student_eligibilities",
+  }),
+  verifiedBy: one(users, {
+    fields: [examEligibility.verifiedById],
+    references: [users.id],
+    relationName: "eligibility_verifier",
+  }),
+}));
+
+// Define relations for activities
+export const activitiesRelations = relations(activities, ({ one }: { one: any }) => ({
+  user: one(users, {
+    fields: [activities.userId],
+    references: [users.id],
+    relationName: "user_activities",
+  }),
+}));
 
 // Insert schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
