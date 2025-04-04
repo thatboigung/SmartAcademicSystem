@@ -67,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (username: string, password: string) => {
+    console.log('Auth login function called with:', username);
     setError(null);
     setIsLoading(true);
 
@@ -82,9 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         // Check password - for demo, we only accept "password"
         if (password !== 'password') {
+          console.error('Invalid password for demo login');
           throw new Error('Invalid password. For demo, please use "password"');
         }
         
+        console.log('Creating demo user with role:', role);
         const demoUser = {
           id: username === 'admin' ? 1 : username === 'lecturer' ? 2 : 3,
           username,
@@ -97,9 +100,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         
         // Save user to localStorage for persistence
+        console.log('Saving user to localStorage:', demoUser);
         localStorage.setItem('demo_user', JSON.stringify(demoUser));
         
+        console.log('Setting user in state');
         setUser(demoUser as User);
+        
+        console.log('Login successful, returning user:', demoUser);
         return demoUser;
       }
       

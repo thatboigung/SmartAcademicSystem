@@ -24,12 +24,16 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 
-const loginSchema = z.object({
+// Import loginSchema from shared schema
+import { loginSchema } from '@shared/schema';
+
+// Extend the schema with custom error messages
+const loginFormSchema = loginSchema.extend({
   username: z.string().min(3, 'Username must be at least 3 characters'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+type LoginFormValues = z.infer<typeof loginFormSchema>;
 
 const Login = () => {
   const { user, login, isLoading, error } = useAuth();
@@ -45,7 +49,7 @@ const Login = () => {
   }, [user, navigate]);
 
   const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(loginFormSchema),
     defaultValues: {
       username: '',
       password: '',
@@ -53,14 +57,18 @@ const Login = () => {
   });
   
   const onSubmit = async (data: LoginFormValues) => {
+    console.log('Login attempt with:', data.username);
     setIsSubmitting(true);
     try {
-      await login(data.username, data.password);
+      console.log('Calling login function...');
+      const user = await login(data.username, data.password);
+      console.log('Login successful, user:', user);
       navigate('/dashboard');
     } catch (err) {
+      console.error('Login error:', err);
       toast({
         title: 'Login failed',
-        description: error || 'Please check your credentials and try again',
+        description: error || (err instanceof Error ? err.message : 'Please check your credentials and try again'),
         variant: 'destructive',
       });
     } finally {
