@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 222 47% 11%;
+    
+    /* Primary indigo shade matching design with lighter/darker variations */
+    --primary: 231 48% 48%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Primary color variations */
+    --primary-50: 231 100% 97%;
+    --primary-100: 231 95% 92%;
+    --primary-200: 231 90% 85%;
+    --primary-300: 231 85% 75%;
+    --primary-400: 231 80% 60%;
+    --primary-500: 231 75% 48%;
+    --primary-600: 231 70% 40%;
+    --primary-700: 231 65% 35%;
+    --primary-800: 231 60% 25%;
+    --primary-900: 231 55% 20%;
+    
+    /* Card colors */
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    
+    /* Popover */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    
+    /* Secondary accent (orange shades) */
+    --secondary: 33 100% 50%;
+    --secondary-foreground: 210 40% 98%;
+    
+    /* Muted styles */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    
+    /* Accent styles */
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    
+    /* Destructive styles */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    
+    /* Border and input styles */
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+    
+    /* Chart colors */
+    --chart-1: 231 48% 48%;
+    --chart-2: 33 100% 50%;
+    --chart-3: 142 76% 36%;
+    --chart-4: 4 90% 58%;
+    --chart-5: 262 83% 58%;
+    
+    /* Sidebar specific colors */
+    --sidebar-background: 231 48% 48%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 231 70% 90%;
+    --sidebar-primary-foreground: 231 48% 48%;
+    --sidebar-accent: 231 48% 55%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 231 48% 40%;
+    --sidebar-ring: 231 48% 30%;
+    
+    /* Status colors */
+    --success: 142 76% 36%;
+    --warning: 33 100% 50%;
+    --info: 214 95% 58%;
+    --error: 4 90% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    font-family: 'Inter', sans-serif;
+    @apply antialiased bg-neutral-50 text-foreground;
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-neutral-100;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary-200 rounded;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary-500;
+  }
+}
