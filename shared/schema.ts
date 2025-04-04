@@ -98,6 +98,7 @@ export const announcements = pgTable("announcements", {
   createdById: integer("created_by_id").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   isPinned: boolean("is_pinned").default(false),
+  isGlobal: boolean("is_global").default(false),
   expiresAt: timestamp("expires_at"),
 });
 

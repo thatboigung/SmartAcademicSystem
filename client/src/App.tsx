@@ -11,6 +11,7 @@ import Courses from "@/pages/courses";
 import Exams from "@/pages/exams";
 import Students from "@/pages/students";
 import ScanQR from "@/pages/scan-qr";
+import Channels from "@/pages/channels";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "./lib/auth";
 
@@ -114,6 +115,14 @@ function App() {
           {() => (
             <Layout>
               <PrivateRoute component={ScanQR} path="/scan-qr" />
+            </Layout>
+          )}
+        </Route>
+
+        <Route path="/channels">
+          {() => (
+            <Layout>
+              <PrivateRoute component={Channels} path="/channels" />
             </Layout>
           )}
         </Route>

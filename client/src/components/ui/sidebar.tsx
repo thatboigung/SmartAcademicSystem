@@ -11,6 +11,12 @@ const navItems: NavItem[] = [
     roles: ['student', 'lecturer', 'admin'],
   },
   {
+    name: 'Channels',
+    icon: 'chat',
+    href: '/channels',
+    roles: ['student', 'lecturer', 'admin'],
+  },
+  {
     name: 'Schedule',
     icon: 'calendar_today',
     href: '/schedule',
