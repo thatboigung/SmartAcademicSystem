@@ -34,31 +34,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           const userData = await res.json();
           if (isMounted) setUser(userData);
-        }
+        } 
       } catch (err) {
         console.error('Auth check error:', err);
       } finally {
         if (isMounted) {
           setIsLoading(false);
-          
-          // For development - create demo user after 2 seconds if auth still loading
-          setTimeout(() => {
-            if (isMounted && isLoading) {
-              console.log('Creating demo user for development');
-              const demoUser = {
-                id: 1,
-                username: 'admin',
-                firstName: 'Admin',
-                lastName: 'User',
-                email: 'admin@example.com',
-                role: 'admin',
-                studentId: null,
-                createdAt: new Date()
-              };
-              setUser(demoUser as User);
-              setIsLoading(false);
-            }
-          }, 2000);
         }
       }
     };
@@ -75,6 +56,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
 
     try {
+      // For development - handle demo users
+      if ((username === 'admin' || username === 'lecturer' || username === 'student') && password === 'password') {
+        console.log(`Using demo ${username} user for development`);
+        
+        // Create demo user based on role
+        const demoUser = {
+          id: username === 'admin' ? 1 : username === 'lecturer' ? 2 : 3,
+          username,
+          firstName: username.charAt(0).toUpperCase() + username.slice(1),
+          lastName: 'User',
+          email: `${username}@example.com`,
+          role: username,
+          studentId: username === 'student' ? 'STU001' : null,
+          createdAt: new Date()
+        };
+        
+        setUser(demoUser as User);
+        return demoUser;
+      }
+      
+      // Normal login flow
       const res = await apiRequest('POST', '/api/auth/login', { username, password });
       const userData = await res.json();
       setUser(userData);
