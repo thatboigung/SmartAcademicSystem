@@ -57,23 +57,16 @@ const Login = () => {
   });
   
   const onSubmit = async (data: LoginFormValues) => {
-    console.log('Login attempt with:', data.username);
+    console.log('Auto login - direct navigation to dashboard');
     setIsSubmitting(true);
-    try {
-      console.log('Calling login function...');
-      const user = await login(data.username, data.password);
-      console.log('Login successful, user:', user);
-      navigate('/dashboard');
-    } catch (err) {
-      console.error('Login error:', err);
-      toast({
-        title: 'Login failed',
-        description: error || (err instanceof Error ? err.message : 'Please check your credentials and try again'),
-        variant: 'destructive',
-      });
-    } finally {
+    
+    // Skip all authentication, just navigate directly
+    navigate('/dashboard');
+    
+    // Set isSubmitting back to false asynchronously to avoid warning
+    setTimeout(() => {
       setIsSubmitting(false);
-    }
+    }, 100);
   };
 
   // Show loading indicator while authentication is being checked

@@ -4,20 +4,34 @@ import { apiRequest } from './queryClient';
 import { User } from '@shared/schema';
 import { AuthContextType } from '@/types';
 
-// Create context with default values
+// Create a default admin user for automatic login
+const autoUser: User = {
+  id: 1,
+  username: 'admin',
+  password: 'password-hash', // Not actually used for validation
+  firstName: 'Admin',
+  lastName: 'User',
+  email: 'admin@example.com',
+  role: 'admin',
+  studentId: null,
+  createdAt: new Date()
+};
+
+// Create context with auto-login values
 const defaultAuth: AuthContextType = {
-  user: null,
-  isLoading: false, // Set initial loading to false
+  user: autoUser, // Set a default user instead of null
+  isLoading: false,
   error: null,
-  login: async () => { throw new Error('Not implemented'); },
-  logout: async () => { throw new Error('Not implemented'); }
+  login: async () => autoUser, // Return the default user
+  logout: async () => {}
 };
 
 const AuthContext = createContext<AuthContextType>(defaultAuth);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(false); // Start with false
+  // Initialize with the auto user to skip authentication completely
+  const [user, setUser] = useState<User | null>(autoUser);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -67,62 +81,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (username: string, password: string) => {
-    console.log('Auth login function called with:', username);
+    console.log('Auto-login enabled - bypassing all validation');
     setError(null);
-    setIsLoading(true);
-
-    try {
-      // Simplify login - auto-login without checking credentials
-      console.log('Auto-login enabled - creating user without validation');
-      
-      // Default to student if no username given
-      const inputUsername = username || 'student';
-      
-      // Create demo user based on role
-      let role = 'student';
-      if (inputUsername === 'admin') role = 'admin';
-      if (inputUsername === 'lecturer') role = 'lecturer';
-      
-      console.log('Creating demo user with role:', role);
-      const demoUser = {
-        id: inputUsername === 'admin' ? 1 : inputUsername === 'lecturer' ? 2 : 3,
-        username: inputUsername,
-        firstName: inputUsername.charAt(0).toUpperCase() + inputUsername.slice(1),
-        lastName: 'User',
-        email: `${inputUsername}@example.com`,
-        role,
-        studentId: role === 'student' ? 'STU001' : null,
-        createdAt: new Date()
-      };
-      
-      // Save user to localStorage for persistence
-      console.log('Saving user to localStorage:', demoUser);
-      localStorage.setItem('demo_user', JSON.stringify(demoUser));
-      
-      console.log('Setting user in state');
-      setUser(demoUser as User);
-      
-      console.log('Login successful, returning user:', demoUser);
-      return demoUser;
-      
-      // Server login flow (uncommented)
-      // Uncomment for production use:
-      /*
-      const res = await apiRequest('POST', '/api/auth/login', { username, password });
-      const userData = await res.json();
-      setUser(userData);
-      
-      // Invalidate any cached queries that might contain user-specific data
-      queryClient.invalidateQueries();
-      return userData;
-      */
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Login failed';
-      setError(message);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
+    
+    // Always use the auto admin user for simplicity
+    console.log('Using pre-configured admin user');
+    const demoUser = autoUser;
+    
+    // Save user to localStorage
+    localStorage.setItem('demo_user', JSON.stringify(demoUser));
+    
+    // Update state
+    setUser(demoUser);
+    
+    console.log('Auto-login successful, returning user:', demoUser);
+    return demoUser;
   };
 
   const logout = async () => {
