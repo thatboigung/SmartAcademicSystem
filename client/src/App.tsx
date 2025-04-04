@@ -53,15 +53,9 @@ const RoleRoute = ({
 
 function App() {
   const { user, isLoading } = useAuth();
-
-  // Prevent rendering routes during authentication loading
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-        <div className="w-16 h-16 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+  
+  // Render routes even during authentication loading
+  // The individual route components will handle loading states
 
   return (
     <>

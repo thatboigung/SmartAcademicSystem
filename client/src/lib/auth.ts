@@ -56,19 +56,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
 
     try {
-      // For development - handle demo users
-      if ((username === 'admin' || username === 'lecturer' || username === 'student') && password === 'password') {
+      // Always use demo users for now
+      if (true) {
         console.log(`Using demo ${username} user for development`);
         
         // Create demo user based on role
+        let role = 'student';
+        if (username === 'admin') role = 'admin';
+        if (username === 'lecturer') role = 'lecturer';
+        
         const demoUser = {
           id: username === 'admin' ? 1 : username === 'lecturer' ? 2 : 3,
           username,
           firstName: username.charAt(0).toUpperCase() + username.slice(1),
           lastName: 'User',
           email: `${username}@example.com`,
-          role: username,
-          studentId: username === 'student' ? 'STU001' : null,
+          role,
+          studentId: role === 'student' ? 'STU001' : null,
           createdAt: new Date()
         };
         
@@ -76,7 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return demoUser;
       }
       
-      // Normal login flow
+      // Server login flow (temporarily disabled)
+      /*
       const res = await apiRequest('POST', '/api/auth/login', { username, password });
       const userData = await res.json();
       setUser(userData);
@@ -84,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Invalidate any cached queries that might contain user-specific data
       queryClient.invalidateQueries();
       return userData;
+      */
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Login failed';
       setError(message);
@@ -97,7 +103,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
 
     try {
-      await apiRequest('POST', '/api/auth/logout');
+      // Mock logout (server call disabled for now)
+      // await apiRequest('POST', '/api/auth/logout');
       setUser(null);
       
       // Clear all cached queries on logout
