@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { QRScannerModal } from '@/components/ui/qr-scanner-modal';
+import ExamEligibilityModal from '@/components/ui/exam-eligibility-modal';
 
 const ScanQRPage = () => {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ const ScanQRPage = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [scannedUser, setScannedUser] = useState<any | null>(null);
   const [scanSuccess, setScanSuccess] = useState(false);
+  const [showEligibilityModal, setShowEligibilityModal] = useState(false);
   
   // Generate QR code token for the current user
   const { data: tokenData, isLoading: tokenLoading, refetch: refetchToken } = useQuery<{ token: string }>({
@@ -52,6 +54,8 @@ const ScanQRPage = () => {
     onSuccess: (data) => {
       setScannedUser(data);
       setScanSuccess(true);
+      // Show the eligibility modal with the student's details
+      setShowEligibilityModal(true);
       toast({
         title: 'QR code verified',
         description: `Verified ${data.firstName} ${data.lastName}`,
@@ -227,6 +231,17 @@ const ScanQRPage = () => {
         onScan={handleScan}
         onClose={() => setShowScanner(false)}
       />
+      
+      {/* Exam Eligibility Modal */}
+      {scannedUser && (
+        <ExamEligibilityModal
+          isOpen={showEligibilityModal}
+          onClose={() => setShowEligibilityModal(false)}
+          studentId={scannedUser.id}
+          studentName={`${scannedUser.firstName} ${scannedUser.lastName}`}
+          studentIdNumber={scannedUser.studentId || ''}
+        />
+      )}
     </div>
   );
 };
