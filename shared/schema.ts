@@ -80,6 +80,16 @@ export const examEligibility = pgTable("exam_eligibility", {
   verifiedAt: timestamp("verified_at"),
 });
 
+// Exam attendance
+export const examAttendance = pgTable("exam_attendance", {
+  id: serial("id").primaryKey(),
+  examId: integer("exam_id").notNull().references(() => exams.id),
+  studentId: integer("student_id").notNull().references(() => users.id),
+  present: boolean("present").notNull().default(true),
+  markedById: integer("marked_by_id").references(() => users.id),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
 // Activities log
 export const activities = pgTable("activities", {
   id: serial("id").primaryKey(),
@@ -342,6 +352,11 @@ export const insertExamEligibilitySchema = createInsertSchema(examEligibility).o
   verifiedAt: true,
 });
 
+export const insertExamAttendanceSchema = createInsertSchema(examAttendance).omit({
+  id: true,
+  timestamp: true,
+});
+
 export const insertActivitySchema = createInsertSchema(activities).omit({
   id: true,
   timestamp: true,
@@ -394,6 +409,9 @@ export type Exam = typeof exams.$inferSelect;
 
 export type InsertExamEligibility = z.infer<typeof insertExamEligibilitySchema>;
 export type ExamEligibility = typeof examEligibility.$inferSelect;
+
+export type InsertExamAttendance = z.infer<typeof insertExamAttendanceSchema>;
+export type ExamAttendance = typeof examAttendance.$inferSelect;
 
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type Activity = typeof activities.$inferSelect;

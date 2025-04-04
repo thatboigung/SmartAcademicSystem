@@ -227,6 +227,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Error fetching exams" });
     }
   });
+  
+  // Get today's exams
+  app.get("/api/exams/today", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      const exams = await storage.getExamsByDateRange(today, tomorrow);
+      res.json(exams);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching today's exams" });
+    }
+  });
+  
+  // Get exams for a specific student
+  app.get("/api/exams/student/:id", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const studentId = Number(req.params.id);
+      
+      if (isNaN(studentId)) {
+        return res.status(400).json({ message: "Invalid student ID" });
+      }
+      
+      const exams = await storage.getExamsByStudentId(studentId);
+      res.json(exams);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching student exams" });
+    }
+  });
+  
+  // Mark exam attendance
+  app.post("/api/exams/attendance", isAuthenticated, hasRole(["admin", "lecturer"]), async (req: Request, res: Response) => {
+    try {
+      const { studentId, examId, present, markedById } = req.body;
+      
+      if (!studentId || !examId) {
+        return res.status(400).json({ message: "Student ID and exam ID are required" });
+      }
+      
+      const attendance = await storage.recordExamAttendance({
+        studentId,
+        examId, 
+        present: present ?? true,
+        markedById: markedById ?? req.session.userId!,
+        timestamp: new Date()
+      });
+      
+      // Log the activity
+      await storage.createActivity({
+        userId: req.session.userId!,
+        action: "Exam Attendance",
+        details: `Marked attendance for student ${studentId} for exam ${examId}`,
+      });
+      
+      res.status(201).json(attendance);
+    } catch (error) {
+      res.status(500).json({ message: "Error recording exam attendance" });
+    }
+  });
 
   app.post("/api/exams", isAuthenticated, hasRole(["admin", "lecturer"]), async (req: Request, res: Response) => {
     try {

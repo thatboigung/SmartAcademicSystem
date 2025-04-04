@@ -1,14 +1,15 @@
 import {
   users, courses, enrollments, sessions, attendance, exams, examEligibility, activities,
-  announcements, announcementRecipients, events, timetable,
+  announcements, announcementRecipients, events, timetable, examAttendance,
   type User, type InsertUser, type Course, type InsertCourse, type Enrollment, type InsertEnrollment,
   type Session, type InsertSession, type Attendance, type InsertAttendance, type Exam, type InsertExam,
   type ExamEligibility, type InsertExamEligibility, type Activity, type InsertActivity,
   type Announcement, type InsertAnnouncement, type AnnouncementRecipient, type InsertAnnouncementRecipient,
-  type Event, type InsertEvent, type TimetableEntry, type InsertTimetableEntry
+  type Event, type InsertEvent, type TimetableEntry, type InsertTimetableEntry,
+  type ExamAttendance, type InsertExamAttendance
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, count } from "drizzle-orm";
+import { eq, and, desc, sql, count, gte, lte, inArray } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -51,8 +52,11 @@ export interface IStorage {
   // Exam operations
   getExam(id: number): Promise<Exam | undefined>;
   getExamsByCourse(courseId: number): Promise<Exam[]>;
+  getExamsByDateRange(startDate: Date, endDate: Date): Promise<Exam[]>;
+  getExamsByStudentId(studentId: number): Promise<any[]>;
   createExam(exam: InsertExam): Promise<Exam>;
   updateExam(id: number, exam: Partial<InsertExam>): Promise<Exam | undefined>;
+  recordExamAttendance(attendance: InsertExamAttendance): Promise<ExamAttendance>;
 
   // Exam eligibility operations
   getExamEligibility(id: number): Promise<ExamEligibility | undefined>;
@@ -106,6 +110,7 @@ export class MemStorage implements IStorage {
   private attendances: Map<number, Attendance>;
   private exams: Map<number, Exam>;
   private examEligibilities: Map<number, ExamEligibility>;
+  private examAttendances: Map<number, ExamAttendance>;
   private activities: Map<number, Activity>;
   private announcements: Map<number, Announcement>;
   private announcementRecipients: Map<number, AnnouncementRecipient>;
@@ -120,6 +125,7 @@ export class MemStorage implements IStorage {
   private attendanceId: number;
   private examId: number;
   private examEligibilityId: number;
+  private examAttendanceId: number;
   private activityId: number;
   private announcementId: number;
   private announcementRecipientId: number;
@@ -134,6 +140,7 @@ export class MemStorage implements IStorage {
     this.attendances = new Map();
     this.exams = new Map();
     this.examEligibilities = new Map();
+    this.examAttendances = new Map();
     this.activities = new Map();
     this.announcements = new Map();
     this.announcementRecipients = new Map();
@@ -147,6 +154,7 @@ export class MemStorage implements IStorage {
     this.attendanceId = 1;
     this.examId = 1;
     this.examEligibilityId = 1;
+    this.examAttendanceId = 1;
     this.activityId = 1;
     this.announcementId = 1;
     this.announcementRecipientId = 1;
@@ -364,6 +372,30 @@ export class MemStorage implements IStorage {
 
   async getExamsByCourse(courseId: number): Promise<Exam[]> {
     return Array.from(this.exams.values()).filter(exam => exam.courseId === courseId);
+  }
+  
+  async getExamsByDateRange(startDate: Date, endDate: Date): Promise<Exam[]> {
+    return Array.from(this.exams.values()).filter(exam => {
+      const examDate = exam.date;
+      return examDate >= startDate && examDate <= endDate;
+    });
+  }
+  
+  async getExamsByStudentId(studentId: number): Promise<Exam[]> {
+    // Get all courses the student is enrolled in
+    const enrollments = await this.getEnrollmentsByStudent(studentId);
+    const courseIds = enrollments.map(enrollment => enrollment.courseId);
+    
+    // Get all exams for those courses
+    return Array.from(this.exams.values()).filter(exam => courseIds.includes(exam.courseId));
+  }
+  
+  async recordExamAttendance(insertAttendance: InsertExamAttendance): Promise<ExamAttendance> {
+    const id = this.examAttendanceId++;
+    const now = new Date();
+    const attendance: ExamAttendance = { ...insertAttendance, id, timestamp: now };
+    this.examAttendances.set(id, attendance);
+    return attendance;
   }
 
   async createExam(insertExam: InsertExam): Promise<Exam> {
@@ -805,6 +837,40 @@ export class DatabaseStorage implements IStorage {
 
   async getExamsByCourse(courseId: number): Promise<Exam[]> {
     return db.select().from(exams).where(eq(exams.courseId, courseId));
+  }
+  
+  async getExamsByDateRange(startDate: Date, endDate: Date): Promise<Exam[]> {
+    return db.select()
+      .from(exams)
+      .where(
+        and(
+          gte(exams.date, startDate),
+          lte(exams.date, endDate)
+        )
+      );
+  }
+  
+  async getExamsByStudentId(studentId: number): Promise<Exam[]> {
+    // Get all enrollments for the student
+    const studentEnrollments = await this.getEnrollmentsByStudent(studentId);
+    const courseIds = studentEnrollments.map(enrollment => enrollment.courseId);
+    
+    if (courseIds.length === 0) return [];
+    
+    // Get all exams for those courses
+    return db.select()
+      .from(exams)
+      .where(inArray(exams.courseId, courseIds));
+  }
+  
+  async recordExamAttendance(insertAttendance: InsertExamAttendance): Promise<ExamAttendance> {
+    const [attendance] = await db.insert(examAttendance)
+      .values({
+        ...insertAttendance,
+        timestamp: new Date()
+      })
+      .returning();
+    return attendance;
   }
 
   async createExam(insertExam: InsertExam): Promise<Exam> {
