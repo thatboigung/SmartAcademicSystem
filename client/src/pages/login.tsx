@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,6 +35,7 @@ const Login = () => {
   const { user, login, isLoading, error } = useAuth();
   const [location, navigate] = useLocation();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Redirect if already logged in
   useEffect(() => {
@@ -52,6 +53,7 @@ const Login = () => {
   });
   
   const onSubmit = async (data: LoginFormValues) => {
+    setIsSubmitting(true);
     try {
       await login(data.username, data.password);
       navigate('/dashboard');
@@ -61,6 +63,8 @@ const Login = () => {
         description: error || 'Please check your credentials and try again',
         variant: 'destructive',
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -116,9 +120,9 @@ const Login = () => {
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={isLoading}
+                disabled={isSubmitting}
               >
-                {isLoading ? 'Signing in...' : 'Sign In'}
+                {isSubmitting ? 'Signing in...' : 'Sign In'}
               </Button>
             </form>
           </Form>

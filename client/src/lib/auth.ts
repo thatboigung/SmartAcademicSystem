@@ -7,7 +7,7 @@ import { AuthContextType } from '@/types';
 // Create context with default values
 const defaultAuth: AuthContextType = {
   user: null,
-  isLoading: true,
+  isLoading: false, // Set initial loading to false
   error: null,
   login: async () => { throw new Error('Not implemented'); },
   logout: async () => { throw new Error('Not implemented'); }
@@ -17,7 +17,7 @@ const AuthContext = createContext<AuthContextType>(defaultAuth);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Start with false
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
