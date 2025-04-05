@@ -35,6 +35,12 @@ const navItems: NavItem[] = [
     roles: ['student', 'lecturer', 'admin'],
   },
   {
+    name: 'Resources',
+    icon: 'folder',
+    href: '/resources',
+    roles: ['student', 'lecturer', 'admin'],
+  },
+  {
     name: 'Exams',
     icon: 'assignment',
     href: '/exams',
@@ -100,7 +106,7 @@ const Sidebar = () => {
         <div className="space-y-1">
           <p className="text-xs text-primary-200 uppercase tracking-wider mb-2">General</p>
           
-          {filteredNavItems.slice(0, 5).map((item) => (
+          {filteredNavItems.slice(0, 6).map((item) => (
             <Link 
               key={item.href}
               href={item.href}
@@ -121,7 +127,7 @@ const Sidebar = () => {
           <div className="mt-6 space-y-1">
             <p className="text-xs text-primary-200 uppercase tracking-wider mb-2">Administration</p>
             
-            {filteredNavItems.slice(5).map((item) => (
+            {filteredNavItems.slice(6).map((item) => (
               <Link 
                 key={item.href}
                 href={item.href}

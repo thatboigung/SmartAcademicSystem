@@ -16,7 +16,8 @@ import {
   insertAnnouncementSchema,
   insertAnnouncementRecipientSchema,
   insertEventSchema,
-  insertTimetableEntrySchema
+  insertTimetableEntrySchema,
+  insertResourceSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -606,6 +607,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid input", details: error.format() });
       }
       res.status(500).json({ message: "Error creating timetable entry" });
+    }
+  });
+
+  // Resource routes
+  app.get("/api/resources", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const courseId = req.query.courseId ? Number(req.query.courseId) : undefined;
+      const type = req.query.type as string | undefined;
+      const uploaderId = req.query.uploaderId ? Number(req.query.uploaderId) : undefined;
+      
+      if (courseId) {
+        const resources = await storage.getResourcesByCourse(courseId);
+        return res.json(resources);
+      }
+      
+      if (type) {
+        const resources = await storage.getResourcesByType(type);
+        return res.json(resources);
+      }
+      
+      if (uploaderId) {
+        const resources = await storage.getResourcesByUploader(uploaderId);
+        return res.json(resources);
+      }
+      
+      const resources = await storage.getResources();
+      res.json(resources);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching resources" });
+    }
+  });
+  
+  app.get("/api/resources/:id", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const resourceId = Number(req.params.id);
+      
+      if (isNaN(resourceId)) {
+        return res.status(400).json({ message: "Invalid resource ID" });
+      }
+      
+      const resource = await storage.getResource(resourceId);
+      
+      if (!resource) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      
+      res.json(resource);
+    } catch (error) {
+      res.status(500).json({ message: "Error fetching resource" });
+    }
+  });
+  
+  app.post("/api/resources", isAuthenticated, hasRole(["admin", "lecturer"]), async (req: Request, res: Response) => {
+    try {
+      const resourceData = insertResourceSchema.parse({
+        ...req.body,
+        uploadedById: req.session.userId
+      });
+      
+      const resource = await storage.createResource(resourceData);
+      
+      // Log the activity
+      await storage.createActivity({
+        userId: req.session.userId!,
+        action: "Resource Uploaded",
+        details: `Uploaded resource: ${resourceData.title} for course ${resourceData.courseId}`,
+      });
+      
+      res.status(201).json(resource);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", details: error.format() });
+      }
+      res.status(500).json({ message: "Error creating resource" });
     }
   });
 

@@ -148,6 +148,22 @@ export const timetable = pgTable("timetable", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Resource types
+export const resourceTypeEnum = pgEnum('resource_type', ['lecture_note', 'slide', 'pdf', 'assignment', 'other']);
+
+// Course resources
+export const resources = pgTable("resources", {
+  id: serial("id").primaryKey(),
+  courseId: integer("course_id").notNull().references(() => courses.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  type: resourceTypeEnum("type").default('other'),
+  url: text("url").notNull(), // URL to the resource
+  uploadedById: integer("uploaded_by_id").notNull().references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  isPublic: boolean("is_public").default(true),
+});
+
 // Announcement recipients (if targeting specific students instead of whole course)
 export const announcementRecipients = pgTable("announcement_recipients", {
   id: serial("id").primaryKey(),
@@ -170,6 +186,7 @@ export const usersRelations = relations(users, ({ many, one }: { many: any; one:
   announcementRecipients: many(announcementRecipients, { relationName: "student_announcements" }),
   organizedEvents: many(events, { relationName: "event_organizer" }),
   timetableEntries: many(timetable, { relationName: "lecturer_timetable" }),
+  uploadedResources: many(resources, { relationName: "user_resources" }),
 }));
 
 // Define relations for courses
@@ -184,6 +201,7 @@ export const coursesRelations = relations(courses, ({ many, one }: { many: any; 
   exams: many(exams, { relationName: "course_exams" }),
   announcements: many(announcements, { relationName: "course_announcements" }),
   timetableEntries: many(timetable, { relationName: "course_timetable" }),
+  resources: many(resources, { relationName: "course_resources" }),
 }));
 
 // Define relations for enrollments
@@ -319,6 +337,20 @@ export const timetableRelations = relations(timetable, ({ one }: { one: any }) =
   }),
 }));
 
+// Define relations for resources
+export const resourcesRelations = relations(resources, ({ one }: { one: any }) => ({
+  course: one(courses, {
+    fields: [resources.courseId],
+    references: [courses.id],
+    relationName: "course_resources",
+  }),
+  uploadedBy: one(users, {
+    fields: [resources.uploadedById],
+    references: [users.id],
+    relationName: "user_resources",
+  }),
+}));
+
 // Insert schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -382,6 +414,11 @@ export const insertTimetableEntrySchema = createInsertSchema(timetable).omit({
   createdAt: true,
 });
 
+export const insertResourceSchema = createInsertSchema(resources).omit({
+  id: true,
+  uploadedAt: true,
+});
+
 // Auth schemas
 export const loginSchema = z.object({
   username: z.string().min(3),
@@ -427,5 +464,8 @@ export type Event = typeof events.$inferSelect;
 
 export type InsertTimetableEntry = z.infer<typeof insertTimetableEntrySchema>;
 export type TimetableEntry = typeof timetable.$inferSelect;
+
+export type InsertResource = z.infer<typeof insertResourceSchema>;
+export type Resource = typeof resources.$inferSelect;
 
 export type LoginCredentials = z.infer<typeof loginSchema>;

@@ -1,12 +1,12 @@
 import {
   users, courses, enrollments, sessions, attendance, exams, examEligibility, activities,
-  announcements, announcementRecipients, events, timetable, examAttendance,
+  announcements, announcementRecipients, events, timetable, examAttendance, resources,
   type User, type InsertUser, type Course, type InsertCourse, type Enrollment, type InsertEnrollment,
   type Session, type InsertSession, type Attendance, type InsertAttendance, type Exam, type InsertExam,
   type ExamEligibility, type InsertExamEligibility, type Activity, type InsertActivity,
   type Announcement, type InsertAnnouncement, type AnnouncementRecipient, type InsertAnnouncementRecipient,
   type Event, type InsertEvent, type TimetableEntry, type InsertTimetableEntry,
-  type ExamAttendance, type InsertExamAttendance
+  type ExamAttendance, type InsertExamAttendance, type Resource, type InsertResource
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, count, gte, lte, inArray } from "drizzle-orm";
@@ -100,6 +100,14 @@ export interface IStorage {
   getTimetableByLecturer(lecturerId: number): Promise<TimetableEntry[]>;
   getTimetableForStudent(studentId: number): Promise<TimetableEntry[]>;
   createTimetableEntry(entry: InsertTimetableEntry): Promise<TimetableEntry>;
+  
+  // Resource operations
+  getResource(id: number): Promise<Resource | undefined>;
+  getResources(): Promise<Resource[]>;
+  getResourcesByCourse(courseId: number): Promise<Resource[]>;
+  getResourcesByType(type: string): Promise<Resource[]>;
+  getResourcesByUploader(uploaderId: number): Promise<Resource[]>;
+  createResource(resource: InsertResource): Promise<Resource>;
 }
 
 export class MemStorage implements IStorage {
@@ -116,6 +124,7 @@ export class MemStorage implements IStorage {
   private announcementRecipients: Map<number, AnnouncementRecipient>;
   private events: Map<number, Event>;
   private timetableEntries: Map<number, TimetableEntry>;
+  private resources: Map<number, Resource>;
   
   // IDs for auto-increment
   private userId: number;
@@ -131,6 +140,7 @@ export class MemStorage implements IStorage {
   private announcementRecipientId: number;
   private eventId: number;
   private timetableEntryId: number;
+  private resourceId: number;
 
   constructor() {
     this.users = new Map();
@@ -146,6 +156,7 @@ export class MemStorage implements IStorage {
     this.announcementRecipients = new Map();
     this.events = new Map();
     this.timetableEntries = new Map();
+    this.resources = new Map();
     
     this.userId = 1;
     this.courseId = 1;
@@ -160,6 +171,7 @@ export class MemStorage implements IStorage {
     this.announcementRecipientId = 1;
     this.eventId = 1;
     this.timetableEntryId = 1;
+    this.resourceId = 1;
 
     // Add some sample data for testing
     this.initSampleData();
@@ -651,6 +663,54 @@ export class MemStorage implements IStorage {
     const entry: TimetableEntry = { ...insertEntry, id };
     this.timetableEntries.set(id, entry);
     return entry;
+  }
+
+  // Resource operations
+  async getResource(id: number): Promise<Resource | undefined> {
+    return this.resources.get(id);
+  }
+
+  async getResources(): Promise<Resource[]> {
+    return Array.from(this.resources.values())
+      .sort((a, b) => {
+        if (!a.uploadedAt || !b.uploadedAt) return 0;
+        return b.uploadedAt.getTime() - a.uploadedAt.getTime();
+      });
+  }
+
+  async getResourcesByCourse(courseId: number): Promise<Resource[]> {
+    return Array.from(this.resources.values())
+      .filter(resource => resource.courseId === courseId)
+      .sort((a, b) => {
+        if (!a.uploadedAt || !b.uploadedAt) return 0;
+        return b.uploadedAt.getTime() - a.uploadedAt.getTime();
+      });
+  }
+
+  async getResourcesByType(type: string): Promise<Resource[]> {
+    return Array.from(this.resources.values())
+      .filter(resource => resource.type === type)
+      .sort((a, b) => {
+        if (!a.uploadedAt || !b.uploadedAt) return 0;
+        return b.uploadedAt.getTime() - a.uploadedAt.getTime();
+      });
+  }
+
+  async getResourcesByUploader(uploaderId: number): Promise<Resource[]> {
+    return Array.from(this.resources.values())
+      .filter(resource => resource.uploadedById === uploaderId)
+      .sort((a, b) => {
+        if (!a.uploadedAt || !b.uploadedAt) return 0;
+        return b.uploadedAt.getTime() - a.uploadedAt.getTime();
+      });
+  }
+
+  async createResource(insertResource: InsertResource): Promise<Resource> {
+    const id = this.resourceId++;
+    const now = new Date();
+    const resource: Resource = { ...insertResource, id, uploadedAt: now };
+    this.resources.set(id, resource);
+    return resource;
   }
 }
 
@@ -1172,6 +1232,49 @@ export class DatabaseStorage implements IStorage {
       } as any)
       .returning();
     return entry;
+  }
+
+  // Resource operations
+  async getResource(id: number): Promise<Resource | undefined> {
+    const [resource] = await db.select().from(resources).where(eq(resources.id, id));
+    return resource;
+  }
+
+  async getResources(): Promise<Resource[]> {
+    return db.select()
+      .from(resources)
+      .orderBy(desc(resources.uploadedAt));
+  }
+
+  async getResourcesByCourse(courseId: number): Promise<Resource[]> {
+    return db.select()
+      .from(resources)
+      .where(eq(resources.courseId, courseId))
+      .orderBy(desc(resources.uploadedAt));
+  }
+
+  async getResourcesByType(type: string): Promise<Resource[]> {
+    return db.select()
+      .from(resources)
+      .where(eq(resources.type, type))
+      .orderBy(desc(resources.uploadedAt));
+  }
+
+  async getResourcesByUploader(uploaderId: number): Promise<Resource[]> {
+    return db.select()
+      .from(resources)
+      .where(eq(resources.uploadedById, uploaderId))
+      .orderBy(desc(resources.uploadedAt));
+  }
+
+  async createResource(insertResource: InsertResource): Promise<Resource> {
+    const [resource] = await db.insert(resources)
+      .values({
+        ...insertResource,
+        uploadedAt: new Date()
+      })
+      .returning();
+    return resource;
   }
 }
 

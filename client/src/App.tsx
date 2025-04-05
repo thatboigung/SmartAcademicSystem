@@ -12,6 +12,7 @@ import Exams from "@/pages/exams";
 import Students from "@/pages/students";
 import ScanQR from "@/pages/scan-qr";
 import Channels from "@/pages/channels";
+import Resources from "@/pages/resources";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "./lib/auth";
 
@@ -123,6 +124,14 @@ function App() {
           {() => (
             <Layout>
               <PrivateRoute component={Channels} path="/channels" />
+            </Layout>
+          )}
+        </Route>
+        
+        <Route path="/resources">
+          {() => (
+            <Layout>
+              <PrivateRoute component={Resources} path="/resources" />
             </Layout>
           )}
         </Route>
